@@ -17,29 +17,20 @@ from sklearn.utils import shuffle
 from sklearn.preprocessing import MinMaxScaler
 from collections import Counter
 
-# To run pipeline, create new class object modelpipeline()
-# Next, execute modelpipeline.runmodel(...)
-# Parameters are:
-# df - DataFrame that has went through data cleaning, processing, feature engineering, containing both features and response
-# No standardization/scaling is required as there is built in function for that
-# varlist - List of all variables/features to use in model, including the response variable. 
-# This allows user to do feature selection first and select only the relevant features before running the model
-# response - Name of the response variable in string format
-# sampletype - For undersampled data, you can use 'naive', 'smote' or 'adasyn' oversampling. If other strings are input, then no oversampling is done.
-# modelname - Choose the type of model to run - user can add more models as required using the if/else clause to check this string input in the buildmodel function
-# text - Text title to put for the confusion matrix output in each iteration of the n-folds stratified cross validation
-# n-fold - number of folds for the stratified cross validation
-
 class modelpipeline:
     def __init__(self):
         pass
     
     def run_model(self, df, varlist, response, standardize, sampletype, modelname, text, n_fold):
-        # Remove any features not wanted based on varlist input
+        # Remove any features not wanted based on varlist input and re-order based on varlist
         df = df[varlist]
-        # We have to remove response from varlist as it is used later to subset out features
+        # We have to remove response from varlist - varlist_noresponse - as it is used later to subset out features
         # Refer to the for loop for the cross validation where X_train and X_test is created at the end of loop
-        varlist.remove(response)
+        varlist_noresponse = []
+        for col in varlist:
+            if col != response:
+                varlist_noresponse.append(col)
+            
             
         if isinstance(n_fold, int) and n_fold > 1:
             # Initialize dictionary to store results
@@ -97,21 +88,21 @@ class modelpipeline:
                 # Combine the subsetted sections for negatives and postives for both train and test before oversampling  
                 df_train = pd.concat([df_one_train, df_zero_train], axis=0)
                 df_test = pd.concat([df_one_test, df_zero_test], axis=0)
-                # varlist has the feature list X without Y while response is the Y
-                # print(varlist)
-                X_train = df_train[varlist]
+                # varlist_noresponse has the feature list X without Y while response is the Y
+                # print(varlist_noresponse)
+                X_train = df_train[varlist_noresponse]
                 # print('Check X train vars after combining pds')
                 # print(X_train.columns.values)
                 y_train = df_train[response]
-                X_test = df_test[varlist]
+                X_test = df_test[varlist_noresponse]
                 y_test = df_test[response]
                 
                 if standardize == True:
                     scaling = MinMaxScaler(feature_range=(-1,1)).fit(X_train)
                     X_train = scaling.transform(X_train)
                     X_test = scaling.transform(X_test)
-                    X_train = pd.DataFrame(X_train, columns=varlist)
-                    X_test = pd.DataFrame(X_test, columns=varlist)
+                    X_train = pd.DataFrame(X_train, columns=varlist_noresponse)
+                    X_test = pd.DataFrame(X_test, columns=varlist_noresponse)
 
                 if sampletype == 'smote':
                     X_train, X_test, y_train, y_test = sampling.smote_oversample(X_train, X_test, y_train, y_test, response)
@@ -130,7 +121,12 @@ class modelpipeline:
                 self.store = self.build_model(X_train, X_test, y_train, y_test, text, modelname, i, n_fold, self.store)
                 
                 # test model with all actual fraud results
-                self.store['actual_accuracy'].append(evaluate.actual_acc(df, self.store['model'], response))
+                if standardize == True:
+                    df_acc = pd.concat([pd.DataFrame(scaling.transform(df[varlist_noresponse]),columns=varlist_noresponse),df[response]],axis=1)
+                    # print(df)
+                    self.store['actual_accuracy'].append(evaluate.actual_acc(df_acc, self.store['model'], response))
+                else:
+                    self.store['actual_accuracy'].append(evaluate.actual_acc(df, self.store['model'], response))
                 
             # Before results are returned, get average of all evaluation metrics and store in store['final'] section
             self.store['final']['accuracy'] = self.avg(self.store['accuracy'])
@@ -141,18 +137,12 @@ class modelpipeline:
             self.store['final']['auc'] = self.avg(self.store['auc'])
             self.store['final']['actual_accuracy'] = self.avg(self.store['actual_accuracy'])
             
-            # Put back response that was removed previously
-            varlist.append(response)
-            
             print('Final Results of ' + str(n_fold) + ' fold CV:')
             print(self.store['final'])
             return self.store
         
         else:
             print('n fold must be an integer greater than 1')
-            
-            # Put back response that was removed previously
-            varlist.append(response)
             return self.store
     
     def build_model(self, X_train, X_test, y_train, y_test, text, modelname, i, n_fold, store):
@@ -189,6 +179,14 @@ class modelpipeline:
             treedepth = math.ceil(math.sqrt(X_train.shape[1]))
             model = RandomForestClassifier(random_state=42, max_depth=treedepth, n_estimators=100)
             model.fit(X_train,y_train)
+        elif modelname == 'RandomForestminus1':
+            treedepth = math.ceil(math.sqrt(X_train.shape[1]))-1
+            model = RandomForestClassifier(random_state=42, max_depth=treedepth, n_estimators=100)
+            model.fit(X_train,y_train)
+        elif modelname == 'RandomForestminus2':
+            treedepth = math.ceil(math.sqrt(X_train.shape[1]))-2
+            model = RandomForestClassifier(random_state=42, max_depth=treedepth, n_estimators=100)
+            model.fit(X_train,y_train)
         else:
             # Parameters based on gridsearchcv of modelname = logistic regresion
             # Leave parameter blank for modelname to run this instance of logistic regression
@@ -204,20 +202,6 @@ class modelpipeline:
         print("\n")
         return store
     
-#     def standardize(self, df, varlist, response):
-#         x_values = df[varlist]
-#         y_values = df[response]
-#         scaling = MinMaxScaler(feature_range=(-1,1)).fit(x_values)
-#         x_values = scaling.transform(x_values)
-#         x_values = pd.DataFrame(x_values, columns=varlist)
-#         df = pd.concat([x_values,y_values], axis=1)
-        # Variables already standardized except for Amount
-        # columns = df.columns.values.tolist()
-        # columns.remove(response)
-        # for column in varlist:
-        #     df[column] = (df[column] - df[column].mean()) / df[column].std()
-
-        return df
     
     def avg(self, array):
         return sum(array) / len(array)

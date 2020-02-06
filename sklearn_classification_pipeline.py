@@ -1,3 +1,14 @@
+# importing packages
+import math
+import numpy as np
+import pandas as pd
+import scipy.stats as stats
+import sklearn
+import imblearn
+import matplotlib.pyplot as plt
+import seaborn as sns
+plt.style.use('ggplot')
+
 from imblearn.over_sampling import RandomOverSampler
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
@@ -15,6 +26,7 @@ from sklearn.model_selection import KFold
 from sklearn.model_selection import cross_val_score
 from sklearn.utils import shuffle
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.calibration import CalibratedClassifierCV
 from collections import Counter
 
 class modelpipeline:
@@ -163,17 +175,26 @@ class modelpipeline:
             model = xgb.XGBClassifier(seed=42, nthread=1, max_depth=math.ceil(math.sqrt(X_train.shape[1]))+1,
                                       n_estimators=100, random_state=42)
             model.fit(X_train, y_train, eval_set=[(X_train, y_train), (X_test, y_test)], verbose=5)
+        # Use Linear SVC instead of sklearn svm.SVC as the former as way faster processing speed
+        # However, LinearSVC does not have .predict_proba function to get probability of response 1
+        # Hence, we need to use CalibratedClassifier that provides .predict_proba functionality
+        # On the bad side, it has it's own CV, so we put 10 fold CV to minimize the dataset loss due to train-test fold
+        # Ideally, we should use the older pipeline code that does not do customized k-fold CV (refer to SCI16. Jupyter Notebook)
         elif modelname == 'SVM_Linear':
             model = LinearSVC(random_state=42) # default C=1 (regularization parameter)
+            model = CalibratedClassifierCV(model, cv=10)
             model.fit(X_train,y_train)
         elif modelname == 'SVM_Linear2':
-            model = LinearSVC(random_state=42, C=2) 
+            model = LinearSVC(random_state=42, C=2)
+            model = CalibratedClassifierCV(model, cv=10)
             model.fit(X_train,y_train)
         elif modelname == 'SVM_Linear0.5':
             model = LinearSVC(random_state=42, C=0.5)
+            model = CalibratedClassifierCV(model, cv=10)
             model.fit(X_train,y_train)
         elif modelname == 'SVM_Linear0.3':
             model = LinearSVC(random_state=42, C=0.3)
+            model = CalibratedClassifierCV(model, cv=10)
             model.fit(X_train,y_train)
         elif modelname == 'RandomForest':
             treedepth = math.ceil(math.sqrt(X_train.shape[1]))
@@ -194,7 +215,8 @@ class modelpipeline:
             model.fit(X_train,y_train)
         
         y_predict = model.predict(X_test)
-        store = evaluate.model_results(y_test, y_predict, text, store)
+        y_predictprob = model.predict_proba(X_test)[:, 1]
+        store = evaluate.model_results(y_test, y_predict, y_predictprob, text, store)
         
         # Store model for usage in measuring actual accuracy of fraud cases
         store['model'] = model
@@ -251,7 +273,7 @@ class evaluate:
         pass
     
     @staticmethod
-    def model_results(y_test, y_predict, text, store):
+    def model_results(y_test, y_predict, y_predictprob, text, store):
         cm = metrics.confusion_matrix(y_test, y_predict)
         print(cm)
         RFC_CM = pd.DataFrame(cm, ['Actual 0', 'Actual 1'], ['Predict 0', 'Predict 1'])
@@ -277,7 +299,7 @@ class evaluate:
         # print('Precision: ' + str(precision))
         f1 = 2 * (recall * precision)/(recall + precision)
         # print('f1 score: ' + str(f1))
-        auc = evaluate.ROC(y_test, y_predict, text)
+        auc = evaluate.ROC(y_test, y_predictprob, text)
         
         store['accuracy'].append(accuracy)
         store['sensitivity'].append(sensitivity)
@@ -289,11 +311,12 @@ class evaluate:
         return store
     
     @staticmethod
-    def ROC(y_test, y_predict, text):
+    def ROC(y_test, y_predictprob, text):
         # IMPORTANT: first argument is true values, second argument is predicted probabilities
-        auc = metrics.roc_auc_score(y_test, y_predict)
+        auc = metrics.roc_auc_score(y_test, y_predictprob)
         # print("AUC value is: " + str(auc))
-        fpr, tpr, thresholds = metrics.roc_curve(y_test, y_predict)
+        fpr, tpr, thresholds = metrics.roc_curve(y_test, y_predictprob)
+        # print("AUC value is also: " + str(metrics.auc(fpr, tpr)))
         plt.plot(fpr, tpr)
         plt.xlim([0.0, 1.0])
         plt.ylim([0.0, 1.0])

@@ -47,7 +47,7 @@ class modelpipeline:
         if isinstance(n_fold, int) and n_fold > 1:
             # Initialize dictionary to store results
             self.store = {"accuracy": [], "actual_accuracy": [], "sensitivity": [], "specificity": [], 
-                          "precision": [], "f1": [], "auc": [], "final": {}}
+                          "precision": [], "f1": [], "auc": [], "pr_auc": [], "final": {}}
             
             # Split dataframes into 2, one for positive response and one for negative
             df_zero = df[df[response] == 0]
@@ -147,6 +147,7 @@ class modelpipeline:
             self.store['final']['precision'] = self.avg(self.store['precision'])
             self.store['final']['f1'] = self.avg(self.store['f1'])
             self.store['final']['auc'] = self.avg(self.store['auc'])
+            self.store['final']['pr_auc'] = self.avg(self.store['pr_auc'])
             self.store['final']['actual_accuracy'] = self.avg(self.store['actual_accuracy'])
             
             print('Final Results of ' + str(n_fold) + ' fold CV:')
@@ -171,10 +172,16 @@ class modelpipeline:
                                       n_estimators=100, random_state=42)
             model.fit(X_train, y_train, eval_set=[(X_train, y_train), (X_test, y_test)], verbose=5)
         elif modelname == 'XGBoostplus1':
-            # XGBoost with one less depth
+            # XGBoost with one more depth
             model = xgb.XGBClassifier(seed=42, nthread=1, max_depth=math.ceil(math.sqrt(X_train.shape[1]))+1,
                                       n_estimators=100, random_state=42)
             model.fit(X_train, y_train, eval_set=[(X_train, y_train), (X_test, y_test)], verbose=5)
+        elif modelname == 'XGBoostplus3':
+            # XGBoost with 3 more depth
+            model = xgb.XGBClassifier(seed=42, nthread=1, max_depth=math.ceil(math.sqrt(X_train.shape[1]))+3,
+                                      n_estimators=100, random_state=42)
+            model.fit(X_train, y_train, eval_set=[(X_train, y_train), (X_test, y_test)], verbose=5)
+            
         # Use Linear SVC instead of sklearn svm.SVC as the former as way faster processing speed
         # However, LinearSVC does not have .predict_proba function to get probability of response 1
         # Hence, we need to use CalibratedClassifier that provides .predict_proba functionality
@@ -208,6 +215,14 @@ class modelpipeline:
             treedepth = math.ceil(math.sqrt(X_train.shape[1]))-2
             model = RandomForestClassifier(random_state=42, max_depth=treedepth, n_estimators=100)
             model.fit(X_train,y_train)
+        elif modelname == 'RandomForestplus2':
+            treedepth = math.ceil(math.sqrt(X_train.shape[1]))+2
+            model = RandomForestClassifier(random_state=42, max_depth=treedepth, n_estimators=100)
+            model.fit(X_train,y_train)
+        elif modelname == 'RandomForestplus4':
+            treedepth = math.ceil(math.sqrt(X_train.shape[1]))+4
+            model = RandomForestClassifier(random_state=42, max_depth=treedepth, n_estimators=100)
+            model.fit(X_train,y_train)
         else:
             # Parameters based on gridsearchcv of modelname = logistic regresion
             # Leave parameter blank for modelname to run this instance of logistic regression
@@ -216,7 +231,7 @@ class modelpipeline:
         
         y_predict = model.predict(X_test)
         y_predictprob = model.predict_proba(X_test)[:, 1]
-        store = evaluate.model_results(y_test, y_predict, y_predictprob, text, store)
+        store = evaluate.model_results(y_test, y_predict, y_predictprob, text, store, i, n_fold)
         
         # Store model for usage in measuring actual accuracy of fraud cases
         store['model'] = model
@@ -273,7 +288,7 @@ class evaluate:
         pass
     
     @staticmethod
-    def model_results(y_test, y_predict, y_predictprob, text, store):
+    def model_results(y_test, y_predict, y_predictprob, text, store, i, n_fold):
         cm = metrics.confusion_matrix(y_test, y_predict)
         print(cm)
         RFC_CM = pd.DataFrame(cm, ['Actual 0', 'Actual 1'], ['Predict 0', 'Predict 1'])
@@ -286,6 +301,7 @@ class evaluate:
         b += 0.5 
         t -= 0.5 
         plt.ylim(b, t) 
+        plt.figure(1,figsize=(4,4))
         plt.show() 
 
         accuracy = metrics.accuracy_score(y_test, y_predict)
@@ -299,7 +315,7 @@ class evaluate:
         # print('Precision: ' + str(precision))
         f1 = 2 * (recall * precision)/(recall + precision)
         # print('f1 score: ' + str(f1))
-        auc = evaluate.ROC(y_test, y_predictprob, text)
+        auc, pr_auc = evaluate.ROC(y_test, y_predictprob, text, i, n_fold)
         
         store['accuracy'].append(accuracy)
         store['sensitivity'].append(sensitivity)
@@ -307,24 +323,59 @@ class evaluate:
         store['precision'].append(precision)
         store['f1'].append(f1)
         store['auc'].append(auc)
+        store['pr_auc'].append(pr_auc)
 
         return store
     
+#     @staticmethod
+#     def ROC(y_test, y_predictprob, text):
+#         # IMPORTANT: first argument is true values, second argument is predicted probabilities
+#         auc = metrics.roc_auc_score(y_test, y_predictprob)
+#         # print("AUC value is: " + str(auc))
+#         fpr, tpr, thresholds = metrics.roc_curve(y_test, y_predictprob)
+#         # print("AUC value is also: " + str(metrics.auc(fpr, tpr)))
+#         plt.plot(fpr, tpr)
+#         plt.xlim([0.0, 1.0])
+#         plt.ylim([0.0, 1.0])
+#         plt.title('ROC curve for ' + text)
+#         plt.xlabel('False Positive Rate (1 - Specificity)')
+#         plt.ylabel('True Positive Rate (Sensitivity)')
+#         plt.grid(True)
+#         return auc
+
     @staticmethod
-    def ROC(y_test, y_predictprob, text):
+    def ROC(y_test, y_predictprob, text, i, n_fold):
         # IMPORTANT: first argument is true values, second argument is predicted probabilities
         auc = metrics.roc_auc_score(y_test, y_predictprob)
         # print("AUC value is: " + str(auc))
+        print("AUC value is: " + str(auc))
         fpr, tpr, thresholds = metrics.roc_curve(y_test, y_predictprob)
         # print("AUC value is also: " + str(metrics.auc(fpr, tpr)))
-        plt.plot(fpr, tpr)
-        plt.xlim([0.0, 1.0])
-        plt.ylim([0.0, 1.0])
-        plt.title('ROC curve for ' + text)
-        plt.xlabel('False Positive Rate (1 - Specificity)')
-        plt.ylabel('True Positive Rate (Sensitivity)')
-        plt.grid(True)
-        return auc
+        # Calculate precision and recall for each threshold
+        precision, recall, _ = metrics.precision_recall_curve(y_test, y_predictprob)
+        pr_auc = metrics.auc(recall, precision)
+        # Only show ROC-AUC graph and PR-AUC graph on last iteration as they look very similar
+        # The full results can be obtained in the results section
+        if n_fold == i:
+            fullgraph = plt.figure(1,figsize=(10,20))
+            plt.style.use('ggplot')
+            ROCAUC_plot = fullgraph.add_subplot(211)
+            ROCAUC_plot.plot(fpr, tpr, color='blue')
+            ROCAUC_plot.set_title('ROC curve for ' + text)
+            ROCAUC_plot.set_xlabel('False Positive Rate (1 - Specificity)')
+            ROCAUC_plot.set_ylabel('True Positive Rate (Sensitivity)')
+            ROCAUC_plot.set_xlim([0.0, 1.0])
+            ROCAUC_plot.set_ylim([0.0, 1.0])
+            ROCAUC_plot.grid(True)
+            PRAUC_plot = fullgraph.add_subplot(212)
+            PRAUC_plot.plot(precision, recall, color='purple')
+            PRAUC_plot.set_title('Precision-Recall curve for ' + text)
+            PRAUC_plot.set_xlabel('Recall')
+            PRAUC_plot.set_ylabel('Precision')
+            PRAUC_plot.set_xlim([0.0, 1.0])
+            PRAUC_plot.set_ylim([0.0, 1.0])
+            PRAUC_plot.grid(True)
+        return auc, pr_auc
 
     @staticmethod
     def actual_acc(df, model, response):

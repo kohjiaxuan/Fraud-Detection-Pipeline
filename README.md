@@ -40,7 +40,7 @@ After the tests have finished, you can read the dictionary object storing the ev
 <br>
 The dictionary object returned will have results for each fold of k-fold cross validation. Evaluation metrics include: <br>
 1. Accuracy
-2. Actual Accuracy (Optional - can be a hold out dataset for testing and can be other metrics other than accuracy
+2. Actual Accuracy (Optional - can be a hold out dataset for testing and can be other metrics other than accuracy)
 3. Sensitvity
 4. Specificity
 5. Precision

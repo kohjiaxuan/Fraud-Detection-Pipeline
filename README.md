@@ -60,3 +60,40 @@ In the last iteration, ROC-AUC curve and PR-AUC curve will be plotted for users 
 ![ROC Curve that plots True Positive Rate against False Positive Rate](https://github.com/kohjiaxuan/Fraud-Detection-Pipeline/blob/master/ROC_AUC_Curve.PNG)
 <br><br>
 ![PR Curve that plots Precision against Recall](https://github.com/kohjiaxuan/Fraud-Detection-Pipeline/blob/master/PR_AUC_Curve.PNG)
+
+## Variable selection via forward elimination
+Updated: 19 May 2020 <br>
+Assuming a large amount of training variables, forward selection can be used to prune the number of variables for model training <br>
+Refer to <b>forward_elim_binary.py</b> for function to do forward selection and (optional) oversampling <br>
+Note that oversampling might cause problems during forward selection due to the training numpy matrix becoming singular and unable to solve the inverse <br>
+
+```
+def forward_selection(df, sig_level, response, removelist, sampling='nil', testratio=0):
+    """
+    :param df: dataframe with both training and response variables
+    :param sig_level: significance level to accept/reject var during forward selection
+    :param response: name of response var in dataframe
+    :param removelist: list of training variables to remove from dataframe
+    :param sampling: type of oversampling to use, smote, naive or nil, default: no sampling done
+    :param testratio: proportion of dataset to remove out before doing oversampling, default: 0
+    :return: list of training variables
+    """
+```
+
+## Variable selection via backward elimination
+Updated: 19 May 2020 <br>
+Assuming a large amount of training variables, backward selection can be used to prune the number of variables for model training <br>
+Refer to <b>backward_elim_binary.py</b> for function to do backward selection <br>
+
+
+```
+def backward_elimination(x, Y, sl, columns):
+    """
+    :param x: numpy array of training variables
+    :param Y: Y is numpy array of response variable
+    :param sl: significance level in float
+    :param columns: list of columns in same horizontal order with x
+    :return: numpy array of selected x AND list of selected training variables passing sig level
+    """
+```
+

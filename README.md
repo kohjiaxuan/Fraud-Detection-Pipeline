@@ -82,7 +82,7 @@ def forward_selection(df, sig_level, response, removelist, sampling='nil', testr
 
 ## Variable selection via backward elimination
 Updated: 19 May 2020 <br>
-Code was adapted from a Medium post and someone's GitHub repo, but unfortunately I forgot the source :( please let me know if you're the writer so that I can give proper credit <br>
+Full credit to Vishal R for his medium post [Feature selection — Correlation and P-value](https://towardsdatascience.com/feature-selection-correlation-and-p-value-da8921bfb3cf) and his code for backward elimination which I adapted <br>
 Assuming a large amount of training variables, backward selection can be used to prune the number of variables for model training <br>
 Refer to <b>backward_elim_binary.py</b> for function to do backward selection <br>
 

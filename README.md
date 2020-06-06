@@ -1,8 +1,9 @@
 # Fraud-Detection-Pipeline
-A structured data pipeline for classification problems that does multiple purposes like scaling, sampling, k-fold stratified cross validation (CV) with evaluation metrics. <br>
-It reduces the need for users to rewrite a lot of code as it's reusability is very high.<br>
-Refer to <b>sklearn_classification_pipeline.py</b> for the full code <br>
-For pipeline that does not have k-fold cross validation which leads to faster testing, use sklearn_classifier_pipeline_optionalCV.py. However this file still supports the internal sklearn cross validation method (can be switched on or off by parameter input). To use the custom k-fold stratified cross validation method, use sklearn_classification_pipeline.py instead.
+* A structured data pipeline for classification problems that does multiple purposes like scaling, sampling, k-fold stratified cross validation (CV) with evaluation metrics. <br>
+* It reduces the need for users to rewrite a lot of code as it's reusability is very high.<br>
+* Refer to <b>sklearn_classification_pipeline.py</b> for the full code <br>
+* For pipeline that does not have k-fold cross validation which leads to faster testing, use sklearn_classifier_pipeline_optionalCV.py. * However this file still supports the internal sklearn cross validation method (can be switched on or off by parameter input). To use the custom k-fold stratified cross validation method, use sklearn_classification_pipeline.py instead.
+* Dataset can be downloaded at https://www.kaggle.com/mlg-ulb/creditcardfraud
 <br><br>
 # Strengths of using a data pipeline:
 1. Customized pipeline works for all forms of classification problems, including fraud detection problems that require oversampling techniques. <br>

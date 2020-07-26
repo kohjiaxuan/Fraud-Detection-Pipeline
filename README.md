@@ -1,5 +1,5 @@
 # Fraud-Detection-Pipeline
-* A structured data pipeline for classification problems that does multiple purposes like scaling, sampling, k-fold stratified cross validation (CV) with evaluation metrics. <br>
+* A structured data science pipeline for classification problems that does multiple purposes like scaling, sampling, k-fold stratified cross validation (CV) with evaluation metrics. <br>
 * It reduces the need for users to rewrite a lot of code as it's reusability is very high.<br>
 * Refer to <b>sklearn_classification_pipeline.py</b> for the full code <br>
 * For pipeline that does not have k-fold cross validation which leads to faster testing, use sklearn_classifier_pipeline_optionalCV.py. * However this file still supports the internal sklearn cross validation method (can be switched on or off by parameter input). To use the custom k-fold stratified cross validation method, use sklearn_classification_pipeline.py instead.
